@@ -15,6 +15,14 @@ document.querySelectorAll('.player').forEach(function (p) {
     if (v.paused) { v.play(); } else { v.pause(); }
   });
   v.addEventListener('play', function () { p.classList.add('playing'); b.setAttribute('aria-label', 'Pausar el vídeo'); });
+  // Píxel: ViewContent la primera vez que le dan al play del VSL.
+  if (p.id === 'vsl') {
+    v.addEventListener('play', function () {
+      if (p.dataset.vc) return;
+      p.dataset.vc = '1';
+      if (window.fbq) fbq('track', 'ViewContent', { content_name: 'VSL Agent Marketing OS' });
+    });
+  }
   v.addEventListener('pause', function () { p.classList.remove('playing'); b.setAttribute('aria-label', 'Reproducir el vídeo'); });
   v.addEventListener('ended', function () { p.classList.remove('playing'); });
 });
