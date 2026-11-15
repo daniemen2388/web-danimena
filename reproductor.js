@@ -98,21 +98,26 @@ document.querySelectorAll('.player').forEach(function (p) {
     });
     return;
   }
-  // VSL: se abre en grande, sin barra de avance. Píxel: ViewContent la primera vez que le dan al play.
+  // VSL: en el móvil se abre en grande; en el ordenador se ve en la página. Sin barra de avance.
+  // Píxel: ViewContent la primera vez que le dan al play.
+  var vistaVsl = function () {
+    if (p.dataset.vc) return;
+    p.dataset.vc = '1';
+    if (window.fbq) fbq('track', 'ViewContent', { content_name: 'VSL Agent Marketing OS' });
+  };
   if (p.id === 'vsl') {
     v.preload = 'metadata';
+    var esMovil = window.matchMedia('(max-width: 768px)');
     b.addEventListener('click', function () {
-      abrirVsl(src, poster, function () {
-        if (p.dataset.vc) return;
-        p.dataset.vc = '1';
-        if (window.fbq) fbq('track', 'ViewContent', { content_name: 'VSL Agent Marketing OS' });
-      });
+      if (esMovil.matches) { if (!v.paused) v.pause(); abrirVsl(src, poster, vistaVsl); return; }
+      if (v.paused) { v.play(); } else { v.pause(); }
     });
-    return;
+    v.addEventListener('play', vistaVsl);
+  } else {
+    b.addEventListener('click', function () {
+      if (v.paused) { v.play(); } else { v.pause(); }
+    });
   }
-  b.addEventListener('click', function () {
-    if (v.paused) { v.play(); } else { v.pause(); }
-  });
   v.addEventListener('play', function () { p.classList.add('playing'); b.setAttribute('aria-label', 'Pausar el vídeo'); });
   v.addEventListener('pause', function () { p.classList.remove('playing'); b.setAttribute('aria-label', 'Reproducir el vídeo'); });
   v.addEventListener('ended', function () { p.classList.remove('playing'); });
