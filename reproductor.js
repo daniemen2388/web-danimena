@@ -1,13 +1,22 @@
-// Reproductor sin barra de avance: un clic reproduce, otro pausa. No hay controles para saltar.
-// Excepción: los vídeos pequeños (.player.small) se abren en grande en una ventana con controles.
+// Reproductores de la web.
+// - VSL (#vsl): se abre en grande en una ventana, SIN barra de avance (no se puede saltar).
+//   Un toque reproduce o pausa; botón de pantalla completa (en el móvil, en horizontal).
+// - Vídeos pequeños (.player.small, página de gracias): se abren en grande con el reproductor normal.
+
+function crearVentana(clase, html) {
+  var d = document.createElement('dialog');
+  d.className = 'vmodal ' + clase;
+  d.innerHTML = html;
+  document.body.appendChild(d);
+  return d;
+}
+
+// ── Vídeos pequeños: reproductor normal con controles ──
 var ventana = null;
 function abrirGrande(src, poster, titulo) {
   if (!ventana) {
-    ventana = document.createElement('dialog');
-    ventana.className = 'vmodal';
-    ventana.innerHTML = '<div class="vmodal-box"><div class="vmodal-top"><p class="vmodal-t"></p><button type="button" class="vmodal-x" aria-label="Cerrar el vídeo">✕</button></div><video controls playsinline controlsList="nodownload"></video></div>';
-    document.body.appendChild(ventana);
-    var cerrar = function () { var vv = ventana.querySelector('video'); vv.pause(); ventana.close(); };
+    ventana = crearVentana('', '<div class="vmodal-box"><div class="vmodal-top"><p class="vmodal-t"></p><button type="button" class="vmodal-x" aria-label="Cerrar el vídeo">✕</button></div><video controls playsinline controlsList="nodownload"></video></div>');
+    var cerrar = function () { ventana.querySelector('video').pause(); ventana.close(); };
     ventana.querySelector('.vmodal-x').addEventListener('click', cerrar);
     ventana.addEventListener('click', function (e) { if (e.target === ventana) cerrar(); });
     ventana.addEventListener('close', function () { ventana.querySelector('video').pause(); });
@@ -18,6 +27,57 @@ function abrirGrande(src, poster, titulo) {
   ventana.showModal();
   var pr = vid.play(); if (pr && pr.catch) pr.catch(function () {});
 }
+
+// ── VSL: ventana grande sin barra de avance ──
+var ventanaVsl = null;
+function abrirVsl(src, poster, alPrimerPlay) {
+  if (!ventanaVsl) {
+    ventanaVsl = crearVentana('vmodal-vsl',
+      '<div class="vmodal-box">' +
+        '<div class="vmodal-top"><p class="vmodal-t">Mira el vídeo completo</p>' +
+          '<div class="vmodal-acc"><button type="button" class="vmodal-fs" aria-label="Pantalla completa">⛶</button>' +
+          '<button type="button" class="vmodal-x" aria-label="Cerrar el vídeo">✕</button></div></div>' +
+        '<div class="vmodal-stage"><video playsinline disablepictureinpicture controlslist="nodownload noplaybackrate nofullscreen"></video>' +
+          '<button type="button" class="vmodal-play" aria-label="Reproducir o pausar"><span class="play-icon" aria-hidden="true"></span></button></div>' +
+      '</div>');
+    var v = ventanaVsl.querySelector('video');
+    var stage = ventanaVsl.querySelector('.vmodal-stage');
+    var bp = ventanaVsl.querySelector('.vmodal-play');
+    v.controls = false;
+    var alternar = function () { if (v.paused) { var pr = v.play(); if (pr && pr.catch) pr.catch(function () {}); } else { v.pause(); } };
+    bp.addEventListener('click', alternar);
+    v.addEventListener('play', function () { stage.classList.add('playing'); });
+    v.addEventListener('pause', function () { stage.classList.remove('playing'); });
+    v.addEventListener('ended', function () { stage.classList.remove('playing'); });
+    var salirFs = function () {
+      ventanaVsl.classList.remove('girado');
+      if (document.fullscreenElement) { document.exitFullscreen().catch(function () {}); }
+      if (screen.orientation && screen.orientation.unlock) { try { screen.orientation.unlock(); } catch (e) {} }
+    };
+    ventanaVsl.querySelector('.vmodal-fs').addEventListener('click', function () {
+      var box = ventanaVsl.querySelector('.vmodal-box');
+      if (document.fullscreenElement || ventanaVsl.classList.contains('girado')) { salirFs(); return; }
+      if (box.requestFullscreen) {
+        box.requestFullscreen().then(function () {
+          if (screen.orientation && screen.orientation.lock) { screen.orientation.lock('landscape').catch(function () {}); }
+        }).catch(function () { ventanaVsl.classList.add('girado'); });
+      } else {
+        // iPhone: no deja pantalla completa sin barra; giramos la ventana para verlo en horizontal.
+        ventanaVsl.classList.add('girado');
+      }
+    });
+    var cerrar = function () { v.pause(); salirFs(); ventanaVsl.close(); };
+    ventanaVsl.querySelector('.vmodal-x').addEventListener('click', cerrar);
+    ventanaVsl.addEventListener('click', function (e) { if (e.target === ventanaVsl) cerrar(); });
+    ventanaVsl.addEventListener('close', function () { v.pause(); salirFs(); });
+    v.addEventListener('play', function () { if (alPrimerPlay) { alPrimerPlay(); alPrimerPlay = null; } });
+  }
+  var vid = ventanaVsl.querySelector('video');
+  if (vid.getAttribute('src') !== src) { vid.src = src; if (poster) vid.poster = poster; }
+  ventanaVsl.showModal();
+  var pr = vid.play(); if (pr && pr.catch) pr.catch(function () {});
+}
+
 document.querySelectorAll('.player').forEach(function (p) {
   var v = p.querySelector('video');
   var b = p.querySelector('.player-btn');
@@ -30,7 +90,7 @@ document.querySelectorAll('.player').forEach(function (p) {
   v.disablePictureInPicture = true;
   v.setAttribute('controlsList', 'nodownload noplaybackrate');
   p.classList.add('ready');
-  // Vídeos pequeños (página de gracias): se abren en grande en una ventana con su reproductor.
+  // Vídeos pequeños (página de gracias): se abren en grande con su reproductor.
   if (p.classList.contains('small')) {
     b.addEventListener('click', function () {
       var t = p.closest('.vid'); var h = t && t.querySelector('h3');
@@ -38,18 +98,22 @@ document.querySelectorAll('.player').forEach(function (p) {
     });
     return;
   }
+  // VSL: se abre en grande, sin barra de avance. Píxel: ViewContent la primera vez que le dan al play.
+  if (p.id === 'vsl') {
+    v.preload = 'metadata';
+    b.addEventListener('click', function () {
+      abrirVsl(src, poster, function () {
+        if (p.dataset.vc) return;
+        p.dataset.vc = '1';
+        if (window.fbq) fbq('track', 'ViewContent', { content_name: 'VSL Agent Marketing OS' });
+      });
+    });
+    return;
+  }
   b.addEventListener('click', function () {
     if (v.paused) { v.play(); } else { v.pause(); }
   });
   v.addEventListener('play', function () { p.classList.add('playing'); b.setAttribute('aria-label', 'Pausar el vídeo'); });
-  // Píxel: ViewContent la primera vez que le dan al play del VSL.
-  if (p.id === 'vsl') {
-    v.addEventListener('play', function () {
-      if (p.dataset.vc) return;
-      p.dataset.vc = '1';
-      if (window.fbq) fbq('track', 'ViewContent', { content_name: 'VSL Agent Marketing OS' });
-    });
-  }
   v.addEventListener('pause', function () { p.classList.remove('playing'); b.setAttribute('aria-label', 'Reproducir el vídeo'); });
   v.addEventListener('ended', function () { p.classList.remove('playing'); });
 });
