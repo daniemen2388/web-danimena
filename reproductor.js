@@ -1,4 +1,23 @@
 // Reproductor sin barra de avance: un clic reproduce, otro pausa. No hay controles para saltar.
+// Excepción: los vídeos pequeños (.player.small) se abren en grande en una ventana con controles.
+var ventana = null;
+function abrirGrande(src, poster, titulo) {
+  if (!ventana) {
+    ventana = document.createElement('dialog');
+    ventana.className = 'vmodal';
+    ventana.innerHTML = '<div class="vmodal-box"><div class="vmodal-top"><p class="vmodal-t"></p><button type="button" class="vmodal-x" aria-label="Cerrar el vídeo">✕</button></div><video controls playsinline controlsList="nodownload"></video></div>';
+    document.body.appendChild(ventana);
+    var cerrar = function () { var vv = ventana.querySelector('video'); vv.pause(); ventana.close(); };
+    ventana.querySelector('.vmodal-x').addEventListener('click', cerrar);
+    ventana.addEventListener('click', function (e) { if (e.target === ventana) cerrar(); });
+    ventana.addEventListener('close', function () { ventana.querySelector('video').pause(); });
+  }
+  var vid = ventana.querySelector('video');
+  ventana.querySelector('.vmodal-t').textContent = titulo;
+  if (vid.getAttribute('src') !== src) { vid.src = src; if (poster) vid.poster = poster; }
+  ventana.showModal();
+  var pr = vid.play(); if (pr && pr.catch) pr.catch(function () {});
+}
 document.querySelectorAll('.player').forEach(function (p) {
   var v = p.querySelector('video');
   var b = p.querySelector('.player-btn');
@@ -11,6 +30,14 @@ document.querySelectorAll('.player').forEach(function (p) {
   v.disablePictureInPicture = true;
   v.setAttribute('controlsList', 'nodownload noplaybackrate');
   p.classList.add('ready');
+  // Vídeos pequeños (página de gracias): se abren en grande en una ventana con su reproductor.
+  if (p.classList.contains('small')) {
+    b.addEventListener('click', function () {
+      var t = p.closest('.vid'); var h = t && t.querySelector('h3');
+      abrirGrande(src, poster, h ? h.textContent : 'Vídeo');
+    });
+    return;
+  }
   b.addEventListener('click', function () {
     if (v.paused) { v.play(); } else { v.pause(); }
   });

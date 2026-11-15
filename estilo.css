@@ -348,3 +348,14 @@ footer .logo{font-size:16px;color:var(--ink)}
   .running-light{display:none}
   .sticky-cta{transition:opacity .2s}
 }
+
+/* Ventana grande para los vídeos de la página de gracias */
+.vmodal{border:0;padding:0;background:transparent;max-width:100vw;max-height:100vh;width:100%;height:100%}
+.vmodal::backdrop{background:rgba(10,10,10,.86)}
+.vmodal[open]{display:flex;align-items:center;justify-content:center}
+.vmodal-box{width:min(1100px,calc(100vw - 32px));display:flex;flex-direction:column;gap:12px}
+.vmodal-top{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.vmodal-t{margin:0;color:#fff;font-weight:700;font-size:17px;line-height:1.3}
+.vmodal-x{flex:none;width:44px;height:44px;border-radius:12px;border:0;background:#fff;color:var(--ink);font-size:18px;font-weight:700;cursor:pointer}
+.vmodal-x:focus-visible{outline:3px solid #C0FF72;outline-offset:3px}
+.vmodal video{width:100%;max-height:calc(100vh - 120px);aspect-ratio:16/9;background:#000;border-radius:14px;display:block}
