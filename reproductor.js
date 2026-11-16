@@ -28,6 +28,30 @@ function abrirGrande(src, poster, titulo) {
   var pr = vid.play(); if (pr && pr.catch) pr.catch(function () {});
 }
 
+// ── VSL: cuánto se ve. Avisa al píxel (evento personalizado) y a Clarity al pasar el 25, 50, 75 y 100 %.
+//    Como no hay barra de avance, el porcentaje es tiempo visto de verdad. Cada hito, una vez por visita.
+var hitosVsl = {};
+function medirVsl(video) {
+  if (video.dataset.mide) return;
+  video.dataset.mide = '1';
+  var marcar = function (pct) {
+    if (hitosVsl[pct]) return;
+    hitosVsl[pct] = true;
+    if (window.fbq) fbq('trackCustom', 'VSL_' + pct, { porcentaje: pct, content_name: 'VSL Agent Marketing OS' });
+    if (window.clarity) { clarity('event', 'vsl_' + pct); clarity('set', 'vsl_visto', String(pct)); }
+  };
+  video.addEventListener('timeupdate', function () {
+    var d = video.duration;
+    if (!d || !isFinite(d)) return;
+    var p = video.currentTime / d;
+    if (p >= 0.25) marcar(25);
+    if (p >= 0.5) marcar(50);
+    if (p >= 0.75) marcar(75);
+    if (p >= 0.98) marcar(100);
+  });
+  video.addEventListener('ended', function () { marcar(25); marcar(50); marcar(75); marcar(100); });
+}
+
 // ── VSL: ventana grande sin barra de avance ──
 var ventanaVsl = null;
 function abrirVsl(src, poster, alPrimerPlay) {
@@ -71,6 +95,7 @@ function abrirVsl(src, poster, alPrimerPlay) {
     ventanaVsl.addEventListener('click', function (e) { if (e.target === ventanaVsl) cerrar(); });
     ventanaVsl.addEventListener('close', function () { v.pause(); salirFs(); });
     v.addEventListener('play', function () { if (alPrimerPlay) { alPrimerPlay(); alPrimerPlay = null; } });
+    medirVsl(v);
   }
   var vid = ventanaVsl.querySelector('video');
   if (vid.getAttribute('src') !== src) { vid.src = src; if (poster) vid.poster = poster; }
@@ -113,6 +138,7 @@ document.querySelectorAll('.player').forEach(function (p) {
       if (v.paused) { v.play(); } else { v.pause(); }
     });
     v.addEventListener('play', vistaVsl);
+    medirVsl(v);
   } else {
     b.addEventListener('click', function () {
       if (v.paused) { v.play(); } else { v.pause(); }
