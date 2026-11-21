@@ -376,3 +376,13 @@ footer .logo{font-size:16px;color:var(--ink)}
   .vmodal-vsl.girado .vmodal-box{position:fixed;top:50%;left:50%;width:100dvh;height:100dvw;transform:translate(-50%,-50%) rotate(90deg);background:#000;padding:10px 14px;box-sizing:border-box;justify-content:center}
   .vmodal-vsl.girado video{max-height:calc(100dvw - 76px)}
 }
+/* VSL de YouTube: arranca en silencio; capa con el botón para activar el sonido (21/11) */
+.vsl-sonido{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;border:0;padding:0;background:rgba(10,10,10,.28);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.vsl-sonido span{display:inline-flex;align-items:center;gap:12px;padding:18px 30px;border-radius:999px;background:#B2F65E;color:#141414;font:600 20px/1.1 'Geist',system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.35);animation:vsl-latido 1.8s ease-in-out infinite}
+.vsl-sonido svg{width:26px;height:26px;flex:none}
+.vsl-sonido:hover span{transform:scale(1.04)}
+.vsl-sonido:focus-visible span{outline:3px solid #fff;outline-offset:4px}
+.player.con-sonido .vsl-sonido{display:none}
+@keyframes vsl-latido{50%{box-shadow:0 10px 30px rgba(0,0,0,.35),0 0 0 10px rgba(178,246,94,.25)}}
+@media (max-width:768px){.vsl-sonido span{padding:13px 20px;font-size:15px;gap:9px}.vsl-sonido svg{width:20px;height:20px}}
+@media (prefers-reduced-motion:reduce){.vsl-sonido span{animation:none}}

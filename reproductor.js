@@ -150,17 +150,21 @@ document.querySelectorAll('.player').forEach(function (p) {
 });
 
 // ── VSL en YouTube (21/11): vídeo oculto con capítulos, se puede avanzar por bloques. ──
-// Píxel «P. DaniMen [1]» y Clarity, igual que con el vídeo propio:
-// - ViewContent la primera vez que le dan al play.
-// - VSL_25 / VSL_50 / VSL_75 / VSL_100: tiempo visto DE VERDAD (los saltos con la barra o los capítulos no cuentan).
-// - VSL_capitulo: cada capítulo al que llega (viendo o saltando), una vez por visita, con su número y su título.
+// Arranca solo y EN SILENCIO al cargar (Dani, 21/11). Encima, un botón «Toca para activar el sonido»:
+// al tocarlo vuelve al segundo 0 con sonido y el botón desaparece.
+// Píxel «P. DaniMen [1]» y Clarity. Lo que se ve en silencio NO cuenta como visto:
+// - VSL_silencio: el vídeo arrancó solo en silencio (una vez por visita; solo informativo).
+// - ViewContent + VSL_sonido: el toque que activa el sonido (es el «play» de verdad).
+// - VSL_25 / VSL_50 / VSL_75 / VSL_100: tiempo visto con sonido, de verdad (los saltos no cuentan).
+// - VSL_capitulo: cada capítulo al que llega con sonido (viendo o saltando), una vez por visita.
 (function () {
   var caja = document.getElementById('vsl');
   if (!caja || !caja.dataset.yt) return;
   var capitulos = (caja.dataset.capitulos || '').split(';').map(function (c) {
     var p = c.split('|'); return { ini: parseFloat(p[0]), nombre: (p[1] || '').trim() };
   }).filter(function (c) { return isFinite(c.ini); });
-  var visto = 0, ultimo = null, hitos = {}, caps = {}, vc = false, reloj = null, player = null;
+  var visto = 0, ultimo = null, hitos = {}, caps = {}, reloj = null, player = null;
+  var conSonido = false, silencioAvisado = false;
   var fb = function (ev, datos) { if (window.fbq) fbq('trackCustom', ev, datos); };
   var cl = function (ev, clave, valor) { if (window.clarity) { clarity('event', ev); if (clave) clarity('set', clave, valor); } };
   var hito = function (pct) {
@@ -180,8 +184,35 @@ document.querySelectorAll('.player').forEach(function (p) {
       }
     }
   };
+
+  // botón encima del vídeo: toda la capa se puede tocar
+  var boton = document.createElement('button');
+  boton.type = 'button';
+  boton.className = 'vsl-sonido';
+  boton.setAttribute('aria-label', 'Activar el sonido y ver el vídeo desde el principio');
+  boton.innerHTML = '<span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>Toca para activar el sonido</span>';
+  caja.appendChild(boton);
+
+  var activarSonido = function (desdeBoton) {
+    if (conSonido || !player) return;
+    conSonido = true;
+    caja.classList.add('con-sonido');
+    if (desdeBoton) { player.seekTo(0, true); }
+    player.unMute(); player.setVolume(100); player.playVideo();
+    visto = 0; ultimo = desdeBoton ? 0 : player.getCurrentTime();
+    if (window.fbq) fbq('track', 'ViewContent', { content_name: 'VSL Agent Marketing OS' });
+    fb('VSL_sonido', { content_name: 'VSL Agent Marketing OS' });
+    cl('vsl_play', 'vsl_sonido', 'si');
+    if (!reloj) reloj = setInterval(medir, 1000);
+  };
+  boton.addEventListener('click', function () { activarSonido(true); });
+
   var medir = function () {
     if (!player || !player.getCurrentTime) return;
+    if (!conSonido) {                       // quitaron el silencio con los controles de YouTube
+      if (player.isMuted && !player.isMuted()) activarSonido(false);
+      return;
+    }
     var t = player.getCurrentTime(), d = player.getDuration();
     if (ultimo !== null) { var dt = t - ultimo; if (dt > 0 && dt <= 1.6) visto += dt; }  // un salto no suma
     ultimo = t;
@@ -196,10 +227,10 @@ document.querySelectorAll('.player').forEach(function (p) {
   };
   var alCambiar = function (e) {
     if (e.data === YT.PlayerState.PLAYING) {
-      if (!vc) { vc = true; if (window.fbq) fbq('track', 'ViewContent', { content_name: 'VSL Agent Marketing OS' }); cl('vsl_play'); }
-      ultimo = player.getCurrentTime();
+      if (!conSonido && !silencioAvisado) { silencioAvisado = true; fb('VSL_silencio', { content_name: 'VSL Agent Marketing OS' }); cl('vsl_silencio'); }
+      if (conSonido) ultimo = player.getCurrentTime();
       if (!reloj) reloj = setInterval(medir, 1000);
-    } else {
+    } else if (conSonido) {
       medir();
       ultimo = null;
       if (reloj) { clearInterval(reloj); reloj = null; }
@@ -208,8 +239,11 @@ document.querySelectorAll('.player').forEach(function (p) {
   var crear = function () {
     player = new YT.Player('vsl-yt', {
       videoId: caja.dataset.yt,
-      playerVars: { rel: 0, playsinline: 1, modestbranding: 1 },
-      events: { onStateChange: alCambiar }
+      playerVars: { autoplay: 1, mute: 1, playsinline: 1, rel: 0, modestbranding: 1 },
+      events: {
+        onReady: function () { player.mute(); player.playVideo(); },
+        onStateChange: alCambiar
+      }
     });
     caja.classList.add('ready');
   };
