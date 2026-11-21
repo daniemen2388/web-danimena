@@ -148,3 +148,74 @@ document.querySelectorAll('.player').forEach(function (p) {
   v.addEventListener('pause', function () { p.classList.remove('playing'); b.setAttribute('aria-label', 'Reproducir el vídeo'); });
   v.addEventListener('ended', function () { p.classList.remove('playing'); });
 });
+
+// ── VSL en YouTube (21/11): vídeo oculto con capítulos, se puede avanzar por bloques. ──
+// Píxel «P. DaniMen [1]» y Clarity, igual que con el vídeo propio:
+// - ViewContent la primera vez que le dan al play.
+// - VSL_25 / VSL_50 / VSL_75 / VSL_100: tiempo visto DE VERDAD (los saltos con la barra o los capítulos no cuentan).
+// - VSL_capitulo: cada capítulo al que llega (viendo o saltando), una vez por visita, con su número y su título.
+(function () {
+  var caja = document.getElementById('vsl');
+  if (!caja || !caja.dataset.yt) return;
+  var capitulos = (caja.dataset.capitulos || '').split(';').map(function (c) {
+    var p = c.split('|'); return { ini: parseFloat(p[0]), nombre: (p[1] || '').trim() };
+  }).filter(function (c) { return isFinite(c.ini); });
+  var visto = 0, ultimo = null, hitos = {}, caps = {}, vc = false, reloj = null, player = null;
+  var fb = function (ev, datos) { if (window.fbq) fbq('trackCustom', ev, datos); };
+  var cl = function (ev, clave, valor) { if (window.clarity) { clarity('event', ev); if (clave) clarity('set', clave, valor); } };
+  var hito = function (pct) {
+    if (hitos[pct]) return; hitos[pct] = true;
+    fb('VSL_' + pct, { porcentaje: pct, content_name: 'VSL Agent Marketing OS' });
+    cl('vsl_' + pct, 'vsl_visto', String(pct));
+  };
+  var capitulo = function (t) {
+    for (var i = capitulos.length - 1; i >= 0; i--) {
+      if (t >= capitulos[i].ini) {
+        if (!caps[i]) {
+          caps[i] = true;
+          fb('VSL_capitulo', { capitulo: i + 1, nombre: capitulos[i].nombre, content_name: 'VSL Agent Marketing OS' });
+          cl('vsl_cap_' + (i + 1), 'vsl_capitulo', String(i + 1));
+        }
+        return;
+      }
+    }
+  };
+  var medir = function () {
+    if (!player || !player.getCurrentTime) return;
+    var t = player.getCurrentTime(), d = player.getDuration();
+    if (ultimo !== null) { var dt = t - ultimo; if (dt > 0 && dt <= 1.6) visto += dt; }  // un salto no suma
+    ultimo = t;
+    capitulo(t);
+    if (d > 0) {
+      var p = visto / d;
+      if (p >= 0.25) hito(25);
+      if (p >= 0.5) hito(50);
+      if (p >= 0.75) hito(75);
+      if (p >= 0.95) hito(100);
+    }
+  };
+  var alCambiar = function (e) {
+    if (e.data === YT.PlayerState.PLAYING) {
+      if (!vc) { vc = true; if (window.fbq) fbq('track', 'ViewContent', { content_name: 'VSL Agent Marketing OS' }); cl('vsl_play'); }
+      ultimo = player.getCurrentTime();
+      if (!reloj) reloj = setInterval(medir, 1000);
+    } else {
+      medir();
+      ultimo = null;
+      if (reloj) { clearInterval(reloj); reloj = null; }
+    }
+  };
+  var crear = function () {
+    player = new YT.Player('vsl-yt', {
+      videoId: caja.dataset.yt,
+      playerVars: { rel: 0, playsinline: 1, modestbranding: 1 },
+      events: { onStateChange: alCambiar }
+    });
+    caja.classList.add('ready');
+  };
+  if (window.YT && window.YT.Player) { crear(); return; }
+  var previo = window.onYouTubeIframeAPIReady;
+  window.onYouTubeIframeAPIReady = function () { if (previo) previo(); crear(); };
+  var s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; s.async = true;
+  document.head.appendChild(s);
+})();
